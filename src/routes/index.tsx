@@ -144,7 +144,7 @@ function Home() {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Something went wrong.";
       toast.error(message);
-      if (phase === "loading") setPhase("setup");
+      setPhase((prev) => (prev === "loading" ? "setup" : prev));
     } finally {
       setBusy(false);
     }
