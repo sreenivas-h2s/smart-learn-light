@@ -47,10 +47,10 @@ export const tutorTurn = createServerFn({ method: "POST" })
     const key = process.env["LOVABLE_API_KEY"];
     if (!key) throw new Error("Missing LOVABLE_API_KEY");
 
-    const { generateText, Output, NoObjectGeneratedError } = await import("ai");
+    const { streamText, Output, NoObjectGeneratedError } = await import("ai");
     const { createLovableAiGatewayProvider } = await import("./ai-gateway.server");
 
-    const gateway = createLovableAiGatewayProvider(key);
+    const gateway = createLovableAiGatewayProvider(key, { structuredOutputs: true });
 
     const system = [
       "You are Lumen, an adaptive learning tutor.",
@@ -95,14 +95,14 @@ export const tutorTurn = createServerFn({ method: "POST" })
     ];
 
     try {
-      const result = await generateText({
+      const result = streamText({
         model: gateway("google/gemini-3.7-flash"),
         system,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         messages: messages as any,
         output: Output.object({ schema: TurnOutput }),
       });
-      return result.output as TutorTurn;
+      return (await result.output) as TutorTurn;
     } catch (error) {
       if (NoObjectGeneratedError.isInstance(error)) {
         throw new Error("The tutor had trouble forming a lesson. Try again.");
