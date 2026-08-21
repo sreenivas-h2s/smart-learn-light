@@ -295,7 +295,7 @@ function Home() {
                 <label className="text-sm font-medium">Pace</label>
                 <Slider
                   value={[pace]}
-                  onValueChange={(v) => setPace(v[0])}
+                  onValueChange={(v) => setPace(v[0] ?? 3)}
                   min={1}
                   max={5}
                   step={1}
