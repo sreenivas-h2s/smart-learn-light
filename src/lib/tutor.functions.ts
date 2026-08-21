@@ -47,10 +47,14 @@ export const tutorTurn = createServerFn({ method: "POST" })
     const key = process.env["LOVABLE_API_KEY"];
     if (!key) throw new Error("Missing LOVABLE_API_KEY");
 
-    const { streamText, Output, NoObjectGeneratedError } = await import("ai");
-    const { createLovableAiGatewayProvider } = await import("./ai-gateway.server");
+    const jsonShape = `{
+  "say": string, "concept": string, "explanation": string, "analogy": string,
+  "difficulty": "intro" | "core" | "stretch",
+  "question": { "prompt": string, "options": [string, string, string, string], "answerIndex": number, "hint": string, "why": string },
+  "skillUpdates": [{ "name": string, "mastery": number }],
+  "focus": string, "nextSteps": [string, string]
+}`;
 
-    const gateway = createLovableAiGatewayProvider(key, { structuredOutputs: true });
 
     const system = [
       "You are Lumen, an adaptive learning tutor.",
