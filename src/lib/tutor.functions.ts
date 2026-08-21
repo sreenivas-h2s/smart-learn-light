@@ -85,32 +85,56 @@ export const tutorTurn = createServerFn({ method: "POST" })
       .filter(Boolean)
       .join("\n");
 
-    const messages: Array<Record<string, unknown>> = [
+    const userContent: unknown = data.image
+      ? [
+          { type: "text", text: contextText },
+          { type: "image_url", image_url: { url: data.image } },
+        ]
+      : contextText;
+
+    const messages = [
+      { role: "system", content: `${system}\n\nRespond with ONLY raw JSON of this shape:\n${jsonShape}` },
       ...data.history.slice(-8).map((m) => ({ role: m.role, content: m.content })),
-      {
-        role: "user",
-        content: data.image
-          ? [
-              { type: "text", text: contextText },
-              { type: "image", image: data.image },
-            ]
-          : contextText,
-      },
+      { role: "user", content: userContent },
     ];
 
-    try {
-      const result = streamText({
-        model: gateway("google/gemini-3.7-flash"),
-        system,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        messages: messages as any,
-        output: Output.object({ schema: TurnOutput }),
-      });
-      return (await result.output) as TutorTurn;
-    } catch (error) {
-      if (NoObjectGeneratedError.isInstance(error)) {
-        throw new Error("The tutor had trouble forming a lesson. Try again.");
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Lovable-API-Key": key,
+      },
+      body: JSON.stringify({
+        model: "google/gemini-3.7-flash",
+        messages,
+        response_format: { type: "json_object" },
+      }),
+    });
+
+    if (!response.ok) {
+      if (response.status === 429) {
+        throw new Error("The tutor is busy right now — try again in a moment.");
       }
-      throw error;
+      if (response.status === 402) {
+        throw new Error("AI credits are exhausted. Add credits in Lovable to keep learning.");
+      }
+      throw new Error(`The tutor couldn't respond (${response.status}).`);
+    }
+
+    const payload = (await response.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const raw = payload.choices?.[0]?.message?.content ?? "";
+    const cleaned = raw
+      .replace(/^```(?:json)?/i, "")
+      .replace(/```$/, "")
+      .trim();
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
+
+    try {
+      return TurnOutput.parse(JSON.parse(cleaned.slice(start, end + 1)));
+    } catch {
+      throw new Error("The tutor had trouble forming a lesson. Try again.");
     }
   });
